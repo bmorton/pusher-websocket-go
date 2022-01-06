@@ -11,7 +11,7 @@ import (
 const (
 	// Default WebSocket endpoint
 	defaultScheme = "wss"
-	defaultHost   = "ws.pusherapp.com"
+	defaultHost   = "ws-us2.pusher.com"
 	defaultPort   = "443"
 )
 
