@@ -5,7 +5,6 @@ package pusher
 import (
 	"encoding/json"
 	"log"
-	s "strings"
 	"time"
 )
 
@@ -26,7 +25,7 @@ const (
 type Client struct {
 	ClientConfig
 
-	bindings chanbindings
+	bindings       chanbindings
 	globalBindings map[*func(string, string, interface{})]struct{}
 
 	*connection
@@ -39,6 +38,7 @@ type Client struct {
 	Channels     []*Channel
 	UserData     Member
 	Debug        bool
+	AuthSigner   func(string, string) (string, error)
 }
 
 type ClientConfig struct {
@@ -73,13 +73,13 @@ func New(key string) *Client {
 // NewWithConfig allows creating a new Pusher client which connects to a custom endpoint
 func NewWithConfig(c ClientConfig) *Client {
 	client := &Client{
-		ClientConfig: c,
-		bindings:     make(chanbindings),
+		ClientConfig:   c,
+		bindings:       make(chanbindings),
 		globalBindings: map[*func(string, string, interface{})]struct{}{},
-		_subscribe:   make(chan *Channel),
-		_unsubscribe: make(chan string),
-		_disconnect:  make(chan bool),
-		Channels:     make([]*Channel, 0),
+		_subscribe:     make(chan *Channel),
+		_unsubscribe:   make(chan string),
+		_disconnect:    make(chan bool),
+		Channels:       make([]*Channel, 0),
 	}
 	go client.runLoop()
 	return client
@@ -260,19 +260,7 @@ func (self *Client) subscribe(channel *Channel) {
 	isPresence := channel.isPresence()
 
 	if isPrivate || isPresence {
-		stringToSign := (s.Join([]string{self.connection.socketID, channel.Name}, ":"))
-		if isPresence {
-			var _userData []byte
-			_userData, err := json.Marshal(self.UserData)
-			if err != nil {
-				panic(err)
-			}
-			userData := string(_userData)
-			payload["channel_data"] = userData
-			stringToSign = s.Join([]string{stringToSign, userData}, ":")
-		}
-		authString := createAuthString(self.Key, self.ClientConfig.Secret, stringToSign)
-		payload["auth"] = authString
+		payload["auth"], _ = self.AuthSigner(self.connection.socketID, channel.Name)
 	}
 
 	message, _ := encode("pusher:subscribe", payload, nil)
@@ -286,7 +274,6 @@ func (self *Client) unsubscribe(channel *Channel) {
 	self.connection.send(message)
 	channel.Subscribed = false
 }
-
 
 func (self *Client) BindGlobal(callback func(string, string, interface{})) {
 	self.globalBindings[&callback] = struct{}{}
