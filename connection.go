@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-var Debug = false
+var Debug = true
 
 const (
 	pusherProtocol = "7"
